@@ -1,4 +1,4 @@
-import functions_class as fc
+import functions_class as fc # import of a module example
 import numpy as np
 
 # fc.print_user_info()
