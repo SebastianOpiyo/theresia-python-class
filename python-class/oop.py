@@ -5,7 +5,6 @@ PROGRAMMING PARADIGMS
 """
 
 # Classes
-
 class Vehicle:
      
      company_name = "TOYOTA" # An example of a class attribute
@@ -20,22 +19,68 @@ class Vehicle:
     
      def fuel(self):
           print(f"fueling")
-
-    
-
-    
-
+   
 
 # instantiate
 Car = Vehicle("red",4,"2000cc")  # An instance of a vehicle in the name of a car
 Lorry = Vehicle("white",8,"3500cc")
 
-if __name__ == "__main__": 
-    #  print(type(Car))
-    # print(f"The color if the car is {Car.color}")
-    # Car.drive()
-    Car.fuel()
-    # print(f"The engine size of the lorry is {Lorry.engine}")
-    #  print(type(Lorry))
+
+# DAY 2 ON CLASSES AND OBJECTS
+
+class Car:
+
+     location_of_manufacture = "Japan" # An example of a class attribute
+
+     def __init__(self, color:str, year:int, make:str):
+          self.color = color # An example of an instance attribute
+          self.year = year
+          self.make = make
+
+     def define(self):
+          print(f"The car is a {self.color}, manufactured in the year {self.year} and its make is {self.make}")
+          return
+
+
+
+toyota_car = Car("red", 2020, "Toyota")
+suzuki_car = Car("blue", 2021, "Suzuki")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if __name__ == "__main__":
+    print(toyota_car.location_of_manufacture) 
+    print(suzuki_car.location_of_manufacture) 
+    # This will raise an error because car_number is not defined in this scope
 
 
