@@ -7,20 +7,15 @@ PROGRAMMING PARADIGMS
 # Encapsulation - 
 # Polymorphism
 
-
-
-
-
 # Classes
 class Vehicle:
      
      company_name = "TOYOTA" # An example of a class attribute
 
-     def __init__(self, color:str,number_tires:int , engine:str):
+     def __init__(self, color:str,wheels:int, brand:str):
           self.color = color
-          self.num_tires = number_tires
-          self.__engine = engine # Private attribute
-          self.fuel_type = None
+          self.num_tires = wheels
+          self.__brand = brand
 
      def driving(self):
           print(f"Driving")
@@ -51,15 +46,27 @@ class Car(Vehicle):
 
      location_of_manufacture = "Japan" # An example of a class attribute
 
-     def __init__(self, color:str, year:int, make:str):
-          self.color = color # An example of an instance attribute
+     def __init__(self, color:str,brand:str, wheels:int, year:int, make:str):
+          # Call parent class constructor first
+          super().__init__(color, wheels, brand)
+          # Initialize the Child class attributes & inherit the rest from the Parent
           self.year = year
           self.make = make
 
      def define(self):
           # print(f"The car is a {self.color}, manufactured in the year {self.year} and its make is {self.make} and its fuel is {self.fuel("Diesel")}")
           print(f"The Company name is {self.company_name}\nAnd the location of manufacturing is {self.location_of_manufacture}")
-          
+
+class Boat(Vehicle):
+
+     def __init__(self, color:str,brand:str, jacket:int):
+          super().__init__(color, 0, brand)
+          self.jacket = jacket
+
+     def driving(self):
+          return "Surfing"
+
+     
 class Aeroplane(Vehicle):
 
      def __init__(self, color, year, make):
@@ -71,11 +78,10 @@ class Aeroplane(Vehicle):
           return "Flying"
 
 
-toyota_car = Car("red", 2020, "Toyota")
-suzuki_car = Car("blue", 2021, "Suzuki")
+toyota_car = Car("red","Toyota",4, 2020, "Premio")
+suzuki_car = Car("blue", "Suzuki", 4, 2021, "Suzuki_22")
 jet = Aeroplane("blue", 2022, "Boeng")
-
-
+boat = Boat("Green","Sailors",5)
 
 
 
