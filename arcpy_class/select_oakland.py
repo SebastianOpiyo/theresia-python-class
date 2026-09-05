@@ -49,6 +49,38 @@ def main():
             dissolve_field=["UNIT_NAME"],
         )
         print(f"Created {buffer_fc}")
+
+        # Create a temporary layer of the bus stops.
+        stops_fc = f"{WORKSPACE}\\UniqueStops_Oklandparks"
+        result = arcpy.management.MakeFeatureLayer(
+            stops_fc,
+            "AC_TransitStops_Summer21"
+        )
+
+        # Get the actual layer from the Result object.
+        stops_layer = result.getOutput(0)
+
+        # Select bus stops that intersect the parks' 1,000-foot buffer.
+        arcpy.management.SelectLayerByLocation(
+            in_layer=stops_layer,
+            overlap_type="INTERSECT",
+            select_features=buffer_fc,
+            selection_type="NEW_SELECTION"
+        )
+
+        # GetCount respects the layer's selection.
+        selected_count = int(arcpy.management.GetCount(stops_layer)[0])
+        print(f"Selected {selected_count} bus stops")
+
+        # Save the selected stops as a permanent feature class.
+        selected_stops_fc = f"{WORKSPACE}\\OaklandStops_Within1000ft"
+
+        arcpy.management.CopyFeatures(
+            in_features=stops_layer,
+            out_feature_class=selected_stops_fc
+        )
+
+        print(f"Created: {selected_stops_fc}")
     except arcpy.ExecuteError:
         print(arcpy.GetMessages(2))
         raise
