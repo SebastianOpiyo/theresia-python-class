@@ -1,90 +1,108 @@
+"""Run in ArcGIS Pro's Python environment. Edit the paths below first."""
+import os
 import arcpy
 
-WORKSPACE = r"X:\arcGIS\GIS-Tutorial\Python-for-ArcGIS-Pro\Chapter2\Chapter2\Chapter2\Chapter2.gdb"
-input_fc = r"X:\arcGIS\GIS-Tutorial\Python-for-ArcGIS-Pro\Chapter2\Chapter2\Chapter2\CPAD_2020b_Units.shp"
-output_fc = f"{WORKSPACE}\\Oklandparks"
-buffer_fc = f"{WORKSPACE}\\Oklandparks_1000ft"
+DATA_FOLDER = r"X:\arcGIS\GIS-Tutorial\Python-for-ArcGIS-Pro\Chapter2\Chapter2\Chapter2"
+WORKSPACE = os.path.join(DATA_FOLDER, "Chapter2.gdb")
+PARKS = os.path.join(DATA_FOLDER, "CPAD_2020b_Units.shp")
+BUS_STOPS = os.path.join(WORKSPACE, "UniqueStops_Summer21")
 
-# Test for existence of locks
-def test_for_locks():
-    for path in (input_fc, output_fc, buffer_fc):
-        if not arcpy.Exists(path):
-            print(f"Does not exist: {path}")
-        elif arcpy.TestSchemaLock(path):
-            print(f"Exclusive schema lock available: {path}")
-        else:
-            print(f"Cannot acquire exclusive schema lock: {path}")
+# Set this to a polygon feature class containing ONLY Oakland's boundary.
+# Leave None only if BUS_STOPS already contains exclusively Oakland stops.
+OAKLAND_BOUNDARY = None # AoI
+
 
 def main():
-    # first test the for schema lock
-    if test_for_locks:
-        print(f"Schema lock exist")
-    print(f"No schema lock!")
-
     arcpy.env.workspace = WORKSPACE
-    for path in (WORKSPACE, input_fc):
+    arcpy.env.overwriteOutput = False  # Preserve results from previous runs.
+    selected_parks = os.path.join(WORKSPACE, "CPAD_2020b_Units_Oakland")
+    buffer_fc = os.path.join(WORKSPACE, "Oaklandparks_1000ft")
+    output_fc = os.path.join(WORKSPACE, "OaklandStops_Within1000ft")
+
+    # Check/validate every required input and output before creating anything.
+    inputs = [WORKSPACE, PARKS, BUS_STOPS]
+    if OAKLAND_BOUNDARY is not None:
+        inputs.append(OAKLAND_BOUNDARY)
+    for path in inputs:
         if not arcpy.Exists(path):
-            raise FileNotFoundError(f"Required input or workspace not found: {path}")
-
-    # Check both outputs before creating anything; preserve existing results.
-    for path in (output_fc, buffer_fc):
+            raise FileNotFoundError(f"Required dataset not found: {path}")
+    for path in (selected_parks, buffer_fc, output_fc):
         if arcpy.Exists(path):
-            raise FileExistsError(f"Output already exists. Choose a new output name: {path}")
+            raise FileExistsError(f"Choose another output name: {path}")
 
+    # In ArcGIS Pro, add the parks shapefile to the map, right-click it,
+    # and choose Attribute Table to examine AGNCY_NAME and UNIT_NAME.
+    # ListFields prints field names without using a data access cursor.
+    fields = [field.name for field in arcpy.ListFields(PARKS)]
+    print("Park fields:", ", ".join(fields))
+    if "AGNCY_NAME" not in fields:
+        raise ValueError("The parks dataset must contain AGNCY_NAME.")
+    # Validate UNIT_NAME,just like the AGNCY_NAME
+
+    # 1. Select park units using the assignment's exact agency name.
+    # Double quotes enclose the Python string; single quotes enclose SQL text.
+    # AddFieldDelimiters supplies the field syntax required by the data format.
+    field = arcpy.AddFieldDelimiters(PARKS, "AGNCY_NAME")
+    query = f"{field} = 'Oakland, City of'"
+    arcpy.analysis.Select(PARKS, selected_parks, query)
+    park_count = int(arcpy.management.GetCount(selected_parks)[0])
+    print(f"Selected {park_count} park units")
+    if park_count == 0:
+        raise ValueError("No parks matched; examine the AGNCY_NAME values.")
+
+    # 2. Buffer park boundaries outward by 1,000 feet.
+    # ALL merges overlapping buffers: proximity to any selected park is enough.
+    # GEODESIC measures distance on the earth; FEET specifies the distance unit.
+    arcpy.analysis.Buffer(
+        in_features=selected_parks,
+        out_feature_class=buffer_fc,
+        buffer_distance_or_field="1000 FEET",
+        dissolve_option="ALL",
+        method="GEODESIC",
+    )
+
+    # 3. A temporary layer supports selections without changing the source.
+    # MakeFeatureLayer returns a Result object; getOutput(0) retrieves its layer.
+    result = arcpy.management.MakeFeatureLayer(
+        BUS_STOPS, "AC_TransitStops_Summer21"
+    )
+    stops_layer = result.getOutput(0)
     try:
-        arcpy.analysis.Select(
-            input_fc, output_fc, "AGNCY_NAME = 'Oakland, City of'"
-        )
-        count = int(arcpy.management.GetCount(output_fc)[0])
-        print(f"Created {output_fc} ({count} parks)")
-        if count == 0:
-            print("No parks matched. Check AGNCY_NAME values; buffer was skipped.")
-            return
-
-        arcpy.analysis.Buffer(
-            in_features=output_fc,
-            out_feature_class=buffer_fc,
-            buffer_distance_or_field="1000 FEET",
-            dissolve_option="LIST",
-            dissolve_field=["UNIT_NAME"],
-        )
-        print(f"Created {buffer_fc}")
-
-        # Create a temporary layer of the bus stops.
-        stops_fc = f"{WORKSPACE}\\UniqueStops_Oklandparks"
-        result = arcpy.management.MakeFeatureLayer(
-            stops_fc,
-            "AC_TransitStops_Summer21"
-        )
-
-        # Get the actual layer from the Result object.
-        stops_layer = result.getOutput(0)
-
-        # Select bus stops that intersect the parks' 1,000-foot buffer.
+        # 4. Select bus stops inside or on the edge of the buffer polygons.
+        # Tool names are case-sensitive: use SelectLayerByLocation.
         arcpy.management.SelectLayerByLocation(
             in_layer=stops_layer,
             overlap_type="INTERSECT",
             select_features=buffer_fc,
-            selection_type="NEW_SELECTION"
+            selection_type="NEW_SELECTION",
         )
 
-        # GetCount respects the layer's selection.
-        selected_count = int(arcpy.management.GetCount(stops_layer)[0])
-        print(f"Selected {selected_count} bus stops")
+        # Agency name alone does not restrict bus stops to Oakland city limits.
+        if OAKLAND_BOUNDARY is not None:
+            # SUBSET_SELECTION keeps only existing matches inside Oakland.
+            arcpy.management.SelectLayerByLocation(
+                in_layer=stops_layer,
+                overlap_type="INTERSECT",
+                select_features=OAKLAND_BOUNDARY,
+                selection_type="SUBSET_SELECTION",
+            )
+        else:
+            print("Assumption: the input bus stops contain only Oakland stops.")
 
-        # Save the selected stops as a permanent feature class.
-        selected_stops_fc = f"{WORKSPACE}\\OaklandStops_Within1000ft"
+        # 5. Save selected stops, including geometry, to a feature class.
+        # Both GetCount and CopyFeatures respect the layer's selection.
+        # Zero selected stops produces an empty output feature class.
+        count = int(arcpy.management.GetCount(stops_layer)[0])
+        arcpy.management.CopyFeatures(stops_layer, output_fc)
+        print(f"Saved {count} bus stops to {output_fc}")
+    finally:
+        # Remove the temporary layer; the source bus stops remain available.
+        arcpy.management.Delete(stops_layer)
 
-        arcpy.management.CopyFeatures(
-            in_features=stops_layer,
-            out_feature_class=selected_stops_fc
-        )
 
-        print(f"Created: {selected_stops_fc}")
+if __name__ == "__main__":
+    try:
+        main()
     except arcpy.ExecuteError:
-        print(arcpy.GetMessages(2))
+        print(arcpy.GetMessages(2))  # Detailed geoprocessing error messages.
         raise
-
-
-if __name__ == '__main__':
-    main()
