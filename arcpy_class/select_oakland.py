@@ -50,6 +50,13 @@ def main():
     if park_count == 0:
         raise ValueError("No parks matched; examine the AGNCY_NAME values.")
 
+    agency_name = arcpy.AddFieldDelimiters(PARKS, 'AGNCY_NAME')
+    parks_sql = f"{agency_name} = 'San Marcos, City of'"
+    # Example use of SearchCursor
+    with arcpy.da.SearchCursor(PARKS, 'AGNCY_NAME',parks_sql ) as cursor:
+        for row in cursor:
+            print(row)
+
     # 2. Buffer park boundaries outward by 1,000 feet.
     # ALL merges overlapping buffers: proximity to any selected park is enough.
     # GEODESIC measures distance on the earth; FEET specifies the distance unit.
@@ -106,3 +113,5 @@ if __name__ == "__main__":
     except arcpy.ExecuteError:
         print(arcpy.GetMessages(2))  # Detailed geoprocessing error messages.
         raise
+
+
